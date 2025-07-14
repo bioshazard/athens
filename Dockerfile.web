@@ -1,0 +1,15 @@
+# Build static web assets and serve with nginx
+FROM node:16-bullseye AS builder
+
+RUN apt-get update && apt-get install -y openjdk-17-jdk curl && \
+    curl -fsSL https://download.clojure.org/install/linux-install-1.10.3.1040.sh -o clojure.sh && \
+    chmod +x clojure.sh && ./clojure.sh && rm clojure.sh
+
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+COPY . .
+RUN yarn prod
+
+FROM nginx:alpine
+COPY --from=builder /app/resources/public/ /usr/share/nginx/html/
