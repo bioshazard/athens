@@ -1,0 +1,55 @@
+version: "3.4"
+services:
+  athens:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    restart: always
+    depends_on:
+      fluree:
+        condition: service_healthy
+    ports:
+      - "3010:3010"
+    volumes:
+      - ./athens-data/logs:/srv/athens/logs
+      - ./athens-data/datascript:/srv/athens/datascript
+    environment:
+      - CONFIG_EDN=${CONFIG_EDN:-{}}
+    healthcheck:
+      test: curl -f localhost:3010/health-check || exit 1
+      interval: 15s
+      timeout: 60s
+      retries: 10
+      start_period: 15s
+
+  proxy:
+    build:
+      context: .
+      dockerfile: nginx.dockerfile
+    restart: always
+    depends_on:
+      athens:
+        condition: service_healthy
+    ports:
+      - "80:80"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "8080:80"
+
+  fluree:
+    image: fluree/ledger:1.0.0-beta17
+    restart: always
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./athens-data/fluree:/var/lib/fluree
+    healthcheck:
+      test: curl -f localhost:8090/fdb/health || exit 1
+      interval: 15s
+      timeout: 30s
+      retries: 3
+      start_period: 15s

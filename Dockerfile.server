@@ -1,0 +1,35 @@
+# Build Athens server and runtime
+FROM node:16-bullseye AS builder
+
+# Install Java and Clojure CLI for shadow-cljs and compilation
+RUN apt-get update && apt-get install -y openjdk-17-jdk curl && \
+    curl -fsSL https://download.clojure.org/install/linux-install-1.10.3.1040.sh -o clojure.sh && \
+    chmod +x clojure.sh && ./clojure.sh && rm clojure.sh
+
+WORKDIR /app
+
+# Install node deps
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Copy source
+COPY deps.edn shadow-cljs.edn ./
+COPY src ./src
+COPY resources ./resources
+COPY script ./script
+
+# Build client assets and server jar
+RUN yarn prod && \
+    yarn server:compile && \
+    yarn server:uberjar
+
+FROM openjdk:16
+WORKDIR /srv/athens
+
+# Copy built jar and run script
+COPY --from=builder /app/target/athens-lan-party-standalone.jar ./
+COPY script/docker-run-lan-party.sh ./
+RUN chmod +x docker-run-lan-party.sh
+
+EXPOSE 3010
+CMD ["/srv/athens/docker-run-lan-party.sh"]
